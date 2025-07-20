@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export interface EmotionLog {
   id: string;
@@ -18,18 +18,47 @@ export interface EmotionStats {
 
 const STORAGE_KEY = 'emotion-tracker-logs';
 
+// Helper function to load logs from localStorage
+const loadLogsFromStorage = (): EmotionLog[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored).map((log: any) => ({
+      ...log,
+      timestamp: new Date(log.timestamp)
+    })) : [];
+  } catch {
+    return [];
+  }
+};
+
 export const useEmotionTracker = () => {
-  const [emotionLogs, setEmotionLogs] = useState<EmotionLog[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored).map((log: any) => ({
-        ...log,
-        timestamp: new Date(log.timestamp)
-      })) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [emotionLogs, setEmotionLogs] = useState<EmotionLog[]>(loadLogsFromStorage);
+
+  // Listen for storage changes from other components/tabs
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) {
+        console.log('📡 Storage change detected, reloading logs');
+        setEmotionLogs(loadLogsFromStorage());
+      }
+    };
+
+    // Listen for storage events (cross-tab changes)
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also listen for custom events (same-tab changes)
+    const handleCustomStorageChange = () => {
+      console.log('🔄 Custom storage event detected, reloading logs');
+      setEmotionLogs(loadLogsFromStorage());
+    };
+
+    window.addEventListener('emotionLogsUpdated', handleCustomStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('emotionLogsUpdated', handleCustomStorageChange);
+    };
+  }, []);
 
   const getTimeOfDay = (date: Date): 'morning' | 'afternoon' | 'evening' | 'night' => {
     const hour = date.getHours();
@@ -59,6 +88,9 @@ export const useEmotionTracker = () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLogs));
       console.log('💾 Saved to localStorage successfully');
+      
+      // Dispatch custom event to notify other components
+      window.dispatchEvent(new CustomEvent('emotionLogsUpdated'));
     } catch (error) {
       console.error('Failed to save emotion log:', error);
     }
@@ -100,6 +132,8 @@ export const useEmotionTracker = () => {
   const clearLogs = useCallback(() => {
     setEmotionLogs([]);
     localStorage.removeItem(STORAGE_KEY);
+    // Notify other components
+    window.dispatchEvent(new CustomEvent('emotionLogsUpdated'));
   }, []);
 
   const getRecentLogs = useCallback((hours: number = 24) => {
