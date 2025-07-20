@@ -4,6 +4,9 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Camera, CameraOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useEmotionTracker } from '@/hooks/useEmotionTracker';
+import EmotionTrends from './EmotionTrends';
+import ContextSuggestions from './ContextSuggestions';
 
 interface EmotionResult {
   emotion: string;
@@ -19,7 +22,10 @@ const EmotionDetector: React.FC = () => {
   const [isDetecting, setIsDetecting] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<EmotionResult | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [lastLoggedEmotion, setLastLoggedEmotion] = useState<string | null>(null);
+  const [lastLogTime, setLastLogTime] = useState<number>(0);
   const { toast } = useToast();
+  const { logEmotion } = useEmotionTracker();
 
   // Load face-api models
   useEffect(() => {
@@ -165,6 +171,19 @@ const EmotionDetector: React.FC = () => {
           position: { x: box.x, y: box.y, width: box.width, height: box.height }
         });
 
+        // Log emotion (throttled to prevent spam)
+        const now = Date.now();
+        const shouldLog = (
+          dominantEmotion !== lastLoggedEmotion || 
+          now - lastLogTime > 5000 // 5 seconds
+        ) && confidence > 0.6; // Only log if confidence is high enough
+
+        if (shouldLog) {
+          logEmotion(dominantEmotion, confidence);
+          setLastLoggedEmotion(dominantEmotion);
+          setLastLogTime(now);
+        }
+
         // Draw face rectangle
         const color = getEmotionColor(dominantEmotion);
         ctx.strokeStyle = color;
@@ -205,8 +224,11 @@ const EmotionDetector: React.FC = () => {
   }, [isCameraActive, isModelLoaded, detectEmotions]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6">
-      <Card className="p-6 bg-gradient-camera border-primary/20">
+    <div className="w-full max-w-6xl mx-auto p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Camera Section */}
+        <div className="lg:col-span-2">
+          <Card className="p-6 bg-gradient-camera border-primary/20">
         <div className="space-y-6">
           {/* Header */}
           <div className="text-center space-y-2">
@@ -306,9 +328,17 @@ const EmotionDetector: React.FC = () => {
             {isModelLoaded && !isCameraActive && "Ready to start"}
             {isCameraActive && !currentEmotion && "Looking for faces..."}
             {isCameraActive && currentEmotion && "Emotion detected!"}
+            </div>
           </div>
+        </Card>
         </div>
-      </Card>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          <ContextSuggestions currentEmotion={currentEmotion?.emotion || null} />
+          <EmotionTrends />
+        </div>
+      </div>
     </div>
   );
 };
