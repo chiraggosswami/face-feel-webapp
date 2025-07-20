@@ -40,6 +40,8 @@ export const useEmotionTracker = () => {
   };
 
   const logEmotion = useCallback((emotion: string, confidence: number) => {
+    console.log('🎭 Logging emotion:', { emotion, confidence, timestamp: new Date().toISOString() });
+    
     const timestamp = new Date();
     const newLog: EmotionLog = {
       id: `${timestamp.getTime()}-${Math.random()}`,
@@ -52,8 +54,11 @@ export const useEmotionTracker = () => {
     const updatedLogs = [...emotionLogs, newLog];
     setEmotionLogs(updatedLogs);
     
+    console.log('📊 Updated logs count:', updatedLogs.length);
+    
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLogs));
+      console.log('💾 Saved to localStorage successfully');
     } catch (error) {
       console.error('Failed to save emotion log:', error);
     }

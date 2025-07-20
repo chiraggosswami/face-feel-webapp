@@ -178,7 +178,16 @@ const EmotionDetector: React.FC = () => {
           now - lastLogTime > 5000 // 5 seconds
         ) && confidence > 0.6; // Only log if confidence is high enough
 
+        console.log('🔍 Emotion detection:', { 
+          emotion: dominantEmotion, 
+          confidence: confidence.toFixed(3),
+          shouldLog,
+          timeSinceLastLog: now - lastLogTime,
+          lastEmotion: lastLoggedEmotion
+        });
+
         if (shouldLog) {
+          console.log('✅ Logging emotion to tracker');
           logEmotion(dominantEmotion, confidence);
           setLastLoggedEmotion(dominantEmotion);
           setLastLogTime(now);
